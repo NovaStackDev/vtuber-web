@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuffie VTuber Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ff3366;
+            --primary-hover: #ff1a53;
+            --bg-glass: rgba(15, 15, 20, 0.6);
+            --bg-glass-hover: rgba(25, 25, 30, 0.8);
+            --border-glass: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-muted: #a0a0b0;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #2a2a35 0%, #0a0a0f 100%);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Glassmorphism Panels */
+        .panel {
+            position: absolute;
+            top: 20px;
+            bottom: 20px;
+            width: 320px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        #outfits-panel { left: 20px; }
+        #animations-panel { right: 20px; }
+
+        .panel-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-glass);
+            background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+        }
+
+        .panel-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(90deg, #fff, #a0a0b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .panel-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        /* Custom Scrollbar */
+        .panel-content::-webkit-scrollbar { width: 6px; }
+        .panel-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .panel-content::-webkit-scrollbar-thumb { background: var(--border-glass); border-radius: 10px; }
+
+        /* Loading Overlay */
+        #loader {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0a0a0f;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            width: 50px; height: 50px;
+            border: 3px solid rgba(255,51,102,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Outfit Checkboxes */
+        .outfit-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .outfit-item:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.1);
+            transform: translateX(4px);
+        }
+
+        .outfit-item input[type="checkbox"] {
+            appearance: none;
+            width: 20px; height: 20px;
+            border: 2px solid var(--text-muted);
+            border-radius: 6px;
+            margin-right: 16px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .outfit-item input[type="checkbox"]:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .outfit-item input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Animation Buttons */
+        .anim-btn {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .anim-btn:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(255,51,102,0.4);
+        }
+
+        .anim-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3);
+        }
+
+        .anim-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: rgba(0,0,0,0.2);
+            border-color: transparent;
+        }
+
+        .anim-btn:disabled::after {
+            content: '2-Char';
+            font-size: 0.7rem;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        #loading-text {
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loading-text">INITIALIZING ENGINE...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div class="panel" id="outfits-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">Wardrobe</h2>
+        </div>
+        <div class="panel-content" id="outfits-container">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    
+        <div class="panel-content" id="animations-container">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+                
+        // Core Setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x1a1a24, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.2, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = Infinity;
+        controls.minDistance = 0.001;
+        controls.maxPolarAngle = Math.PI / 1.5;
+
+        // Lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(3, 10, 5);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        
+        const rimLight = new THREE.SpotLight(0xff3366, 2);
+        rimLight.position.set(-5, 5, -5);
+        rimLight.lookAt(0, 1, 0);
+        scene.add(rimLight);
+
+        // State
+        const loaderText = document.getElementById('loading-text');
+        const gltfLoader = new GLTFLoader();
+                let mixer = null;
+        let clock = new THREE.Clock();
+        let activeAction = null;
+        
+        let characterMesh = null;
+        let characterSkeleton = null;
+        const loadedOutfits = {};
+
+        // Data
+        const EXPORT_DIR = '../outfits/'; const CHAR_DIR = '../characters/';
+                
+        const OUTFITS = [
+            'eyes', 'Hair', 'Original_Clothing', 'Casual', 'Casual_2', 
+            'Lingerie', 'Bikini_Bodysuit', 'bikini', 'Bunny', 
+            'Lali_Pantyhose', 'Extras'
+        ];
+
+        
+
+        // --------------------------------------------------------
+        // 1. DYNAMIC BONE MAPPING DICTIONARY (Rigify FBX -> VRM)
+        // --------------------------------------------------------
+        const boneMap = {
+            'thighL': 'upper_leg.L',
+            'thighR': 'upper_leg.R',
+            'shinL': 'lower_leg.L',
+            'shinR': 'lower_leg.R',
+            'footL': 'foot.L',
+            'footR': 'foot.R',
+            'toeL': 'toes.L',
+            'toeR': 'toes.R',
+            'upper_armL': 'upper_arm.L',
+            'upper_armR': 'upper_arm.R',
+            'forearmL': 'lower_arm.L',
+            'forearmR': 'lower_arm.R',
+            'handL': 'hand.L',
+            'handR': 'hand.R',
+            
+            // Sometimes they use FK prefixes
+            'thigh_fkL': 'upper_leg.L',
+            'thigh_fkR': 'upper_leg.R',
+            'shin_fkL': 'lower_leg.L',
+            'shin_fkR': 'lower_leg.R',
+            'foot_fkL': 'foot.L',
+            'foot_fkR': 'foot.R',
+            
+            // Mixamo bones
+            'mixamorigHips': 'hip(drv)',
+            'mixamorigSpine': 'spine',
+            'mixamorigSpine1': 'spine.001',
+            'mixamorigSpine2': 'spine.002',
+            'mixamorigNeck': 'neck',
+            'mixamorigHead': 'head',
+            'mixamorigLeftShoulder': 'shoulder.L',
+            'mixamorigLeftArm': 'upper_arm.L',
+            'mixamorigLeftForeArm': 'lower_arm.L',
+            'mixamorigLeftHand': 'hand.L',
+            'mixamorigRightShoulder': 'shoulder.R',
+            'mixamorigRightArm': 'upper_arm.R',
+            'mixamorigRightForeArm': 'lower_arm.R',
+            'mixamorigRightHand': 'hand.R',
+            'mixamorigLeftUpLeg': 'upper_leg.L',
+            'mixamorigLeftLeg': 'lower_leg.L',
+            'mixamorigLeftFoot': 'foot.L',
+            'mixamorigLeftToeBase': 'toes.L',
+            'mixamorigRightUpLeg': 'upper_leg.R',
+            'mixamorigRightLeg': 'lower_leg.R',
+            'mixamorigRightFoot': 'foot.R',
+            'mixamorigRightToeBase': 'toes.R'
+        };
+
+        
+
+        // --------------------------------------------------------
+        // 2. LOAD BASE VRM
+        // --------------------------------------------------------
+        loaderText.innerText = "LOADING BASE MESH...";
+        gltfLoader.load(`${CHAR_DIR}Yuffie.vrm`, (gltf) => {
+            characterMesh = gltf.scene;
+
+            scene.add(characterMesh);
+            
+            // Find the main skeleton and fix materials
+            characterMesh.traverse((child) => {
+                if (child.isSkinnedMesh && !characterSkeleton) {
+                    characterSkeleton = child.skeleton;
+                }
+                
+                // Fix black skin issue and hide occluding eye layers
+                if (child.isMesh && child.material) {
+                    const fixMat = (mat) => {
+                        mat.metalness = 0.0;
+                        mat.roughness = 0.8;
+                        
+                        if (mat.name && mat.name.toLowerCase().includes('eyelash')) {
+                            if (mat.color) mat.color.setHex(0x111111); // Dark color for eyelashes
+                            mat.transparent = true;
+                            mat.alphaTest = 0.1;
+                        } else if (mat.map) {
+                            mat.vertexColors = false;
+                            if (mat.color) mat.color.setHex(0xffffff);
+                        }
+                        
+                        if (mat.map) {
+                            mat.map.wrapS = THREE.RepeatWrapping;
+                            mat.map.wrapT = THREE.RepeatWrapping;
+                        }
+                        
+                        // Genesis 8 outer eye shells block the inner textured eyes if not transparent
+                        if (mat.name && (mat.name.includes('Cornea') || mat.name.includes('Moisture') || mat.name.includes('Tear'))) {
+                            mat.transparent = true;
+                            mat.opacity = 0;
+                            mat.depthWrite = false;
+                        }
+                        
+                        mat.needsUpdate = true;
+                    };
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(fixMat);
+                    } else {
+                        fixMat(child.material);
+                    }
+                }
+                
+                // Collect blink morph targets
+                if (child.isMesh && child.morphTargetDictionary) {
+                    let blinkIndices = [];
+                    for (let key in child.morphTargetDictionary) {
+                        let lower = key.toLowerCase();
+                        if (lower.includes('eyeblink') || lower.includes('facs_bs_eyeblink')) {
+                            blinkIndices.push(child.morphTargetDictionary[key]);
+                        }
+                    }
+                    if (blinkIndices.length > 0) {
+                        if (!window.blinkMeshes) window.blinkMeshes = [];
+                        window.blinkMeshes.push({ mesh: child, indices: blinkIndices });
+                    }
+                }
+            });
+
+            mixer = new THREE.AnimationMixer(characterMesh);
+
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+
+            buildUI();
+        });
+
+        // --------------------------------------------------------
+        // 3. OUTFIT LOGIC
+        // --------------------------------------------------------
+        function toggleOutfit(name, isChecked) {
+            if (isChecked) {
+                if (loadedOutfits[name]) {
+                    loadedOutfits[name].visible = true;
+                    if (name === 'eyes') {
+                        let oldL = characterMesh.getObjectByName('Eye_L');
+                        let oldR = characterMesh.getObjectByName('Eye_R');
+                        if (oldL) oldL.visible = true;
+                        if (oldR) oldR.visible = true;
+                    }
+                    return;
+                }
+                
+                // Load Outfit
+                let modelPath = `${EXPORT_DIR}${name}.glb?v=2`;
+                if (name === 'eyes') {
+                    modelPath = `../eyes/${window.currentEyeModel || 'eyes'}.glb`;
+                }
+                
+                gltfLoader.load(modelPath, (gltf) => {
+                    const outfitScene = gltf.scene;
+                    
+                    // Bind to main skeleton
+                    outfitScene.traverse((child) => {
+                        if (child.isSkinnedMesh && characterSkeleton) {
+                            child.skeleton = characterSkeleton;
+                        }
+                        // Fix materials
+                        if (child.isMesh && child.material) {
+                            const fixMat = (mat) => {
+                                mat.metalness = 0.0;
+                                mat.roughness = 0.8;
+                                
+                                // Face gloss fix: Isolate lip gloss, make skin matte
+                                if (mat.name && mat.name.toLowerCase().includes('face')) {
+                                    mat.onBeforeCompile = (shader) => {
+                                        shader.fragmentShader = shader.fragmentShader.replace(
+                                            '#include <roughnessmap_fragment>',
+                                            `
+                                            float roughnessFactor = roughness;
+                                            #ifdef USE_ROUGHNESSMAP
+                                                vec4 texelRoughness = texture2D( roughnessMap, vRoughnessMapUv );
+                                                float rVal = texelRoughness.g;
+                                                // If roughness is very low (lips), keep it glossy. Otherwise, force matte.
+                                                roughnessFactor *= (rVal < 0.3) ? rVal : 1.0;
+                                            #endif
+                                            `
+                                        );
+                                    };
+                                }
+
+                                if (name !== 'eyes') {
+                                    if (mat.map) {
+                                        mat.vertexColors = false;
+                                        if (mat.color) mat.color.setHex(0xffffff);
+                                    }
+                                }
+
+                                if (name === 'Hair') {
+                                    mat.transparent = true;
+                                    mat.depthWrite = false;
+                                    mat.side = THREE.DoubleSide;
+                                    mat.alphaTest = 0.01;
+                                }
+
+                                mat.needsUpdate = true;
+                            };
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(fixMat);
+                            } else {
+                                fixMat(child.material);
+                            }
+                        }
+                    });
+
+                    // Add a second, slightly offset layer of hair for extra density!
+                    if (name === 'Hair') {
+                        const hairClones = [];
+                        outfitScene.traverse((child) => {
+                            if (child.isMesh) {
+                                const layer2 = child.clone();
+                                layer2.geometry = child.geometry.clone();
+                                layer2.name = "Hair_Clone"; // Name it so the readout shows what we selected
+                                hairClones.push({ parent: child.parent, mesh: layer2 });
+                                
+                                                            }
+                        });
+                        hairClones.forEach(item => {
+                            if (item.parent) item.parent.add(item.mesh);
+                        });
+                    }
+                    
+                    // Custom logic to attach static eyes to their bones
+                    if (name === 'eyes') {
+                        let leftEye = outfitScene.getObjectByName('Eye_L') || outfitScene.children[0];
+                        let rightEye = outfitScene.getObjectByName('Eye_R') || outfitScene.children[1];
+                        if (leftEye) leftEye.name = 'Eye_L';
+                        if (rightEye) rightEye.name = 'Eye_R';
+
+                        // If the downloaded GLB only has ONE eyeball, duplicate it for the right eye!
+                        if (!rightEye && leftEye) {
+                            rightEye = leftEye.clone();
+                        }
+                        
+                        let l_EyeBone = characterMesh.getObjectByName('l_Eye') || characterMesh.getObjectByName('eyeL') || characterMesh.getObjectByName('eye.L');
+                        let r_EyeBone = characterMesh.getObjectByName('r_Eye') || characterMesh.getObjectByName('eyeR') || characterMesh.getObjectByName('eye.R');
+
+                        // --- VISUAL DEBUGGER ---
+                        if (!window.eyeDebugger) {
+                            window.eyeDebugger = document.createElement('div');
+                            window.eyeDebugger.style.position = 'absolute';
+                            window.eyeDebugger.style.top = '10px';
+                            window.eyeDebugger.style.left = '10px';
+                            window.eyeDebugger.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                            window.eyeDebugger.style.color = '#0f0';
+                            window.eyeDebugger.style.padding = '10px';
+                            window.eyeDebugger.style.fontFamily = 'monospace';
+                            window.eyeDebugger.style.zIndex = '9999';
+                            document.body.appendChild(window.eyeDebugger);
+                        }
+                        
+                        let logMsg = `<b>--- EYE LOADING DEBUG ---</b><br>`;
+                        logMsg += `l_EyeBone found: ${l_EyeBone ? 'YES' : 'NO'}<br>`;
+                        logMsg += `r_EyeBone found: ${r_EyeBone ? 'YES' : 'NO'}<br>`;
+                        logMsg += `leftEye found: ${leftEye ? 'YES ('+leftEye.name+')' : 'NO'}<br>`;
+                        logMsg += `rightEye found: ${rightEye ? 'YES ('+rightEye.name+')' : 'NO'}<br>`;
+
+                        // Clean up old visual debugger
+                        if (window.eyeDebugger) {
+                            window.eyeDebugger.remove();
+                            window.eyeDebugger = null;
+                        }
+
+                        let headBone = characterMesh.getObjectByName('head') || characterMesh.getObjectByName('Head');
+                        
+                        const formatEye = (eyeObj, isLeft) => {
+                            if (!eyeObj) return null;
+                            if (isLeft) {
+                                eyeObj.position.set(0.0318, 1.5899, 0.0748);
+                                eyeObj.rotation.set(0.0290, 0.0812, 2.7793);
+                                eyeObj.scale.set(1.1000, 1.1290, 1.1000);
+                            } else {
+                                eyeObj.position.set(-0.0327, 1.5899, 0.0748);
+                                eyeObj.rotation.set(0.0290, 0.0812, 2.7793);
+                                eyeObj.scale.set(1.1752, 1.1752, 1.1752);
+                            }
+                            return eyeObj;
+                        };
+
+                        if (leftEye) {
+                            formatEye(leftEye, true);
+                            scene.add(leftEye);
+                            if (headBone) headBone.attach(leftEye);
+                        }
+                        if (rightEye) {
+                            formatEye(rightEye, false);
+                            scene.add(rightEye);
+                            if (headBone) headBone.attach(rightEye);
+                        }
+                        
+                        
+                        // GUI was moved to base loader
+                    } else {
+                        scene.add(outfitScene);
+                    }
+                    loadedOutfits[name] = outfitScene;
+                });
+            } else {
+                if (loadedOutfits[name]) {
+                    loadedOutfits[name].visible = false;
+                    if (name === 'eyes') {
+                        let oldL = characterMesh.getObjectByName('Eye_L');
+                        let oldR = characterMesh.getObjectByName('Eye_R');
+                        if (oldL) oldL.visible = false;
+                        if (oldR) oldR.visible = false;
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------------------------
+        // 5. BUILD UI
+        // --------------------------------------------------------
+        function buildUI() {
+            const outfitsContainer = document.getElementById('outfits-container');
+            OUTFITS.forEach(outfit => {
+                const label = document.createElement('label');
+                label.className = 'outfit-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.addEventListener('change', (e) => toggleOutfit(outfit, e.target.checked));
+                
+                let labelText = outfit.replace(/_/g, ' ');
+                if (outfit === 'Original_Clothing') labelText += ' (not-showing)';
+                const text = document.createTextNode(labelText);
+                
+                label.appendChild(checkbox);
+                label.appendChild(text);
+                
+
+                outfitsContainer.appendChild(label);
+
+                // Auto-load essential parts on start
+                if (outfit === 'eyes' || outfit === 'Hair') {
+                    checkbox.checked = true;
+                    toggleOutfit(outfit, true);
+                }
+            });
+
+            
+        }
+
+        // --------------------------------------------------------
+        // RENDER LOOP & INTERACTION
+        // --------------------------------------------------------
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let blinkTimer = 0;
+        let isBlinking = false;
+        let blinkProgress = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            
+            // Procedural Blink Logic
+            if (window.blinkMeshes && window.blinkMeshes.length > 0) {
+                blinkTimer += delta;
+                // Blink randomly every 2 to 6 seconds
+                if (!isBlinking && blinkTimer > Math.random() * 4 + 2) {
+                    isBlinking = true;
+                    blinkTimer = 0;
+                    blinkProgress = 0;
+                }
+                
+                if (isBlinking) {
+                    blinkProgress += delta * 15; // Blink speed
+                    let blinkValue = Math.sin(Math.min(blinkProgress, Math.PI));
+                    
+                    if (blinkProgress >= Math.PI) {
+                        isBlinking = false;
+                        blinkValue = 0;
+                    }
+                    
+                    window.blinkMeshes.forEach(bm => {
+                        bm.indices.forEach(idx => {
+                            bm.mesh.morphTargetInfluences[idx] = blinkValue;
+                        });
+                    });
+                }
+            }
+
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
